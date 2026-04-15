@@ -245,18 +245,21 @@ function buildActionButtons(tx, isMyCard) {
   // ── 공통: 수정 ──
   html += `<button class="btn btn-outline btn-sm" data-action="edit" data-id="${tx.id}">✏️ 수정</button>`;
 
-  if (isCompleted) {
-    // 숨기기 / 복원
-    html += tx.hidden
-      ? `<button class="btn btn-hide btn-sm" data-action="unhide" data-id="${tx.id}">👁️ 복원</button>`
-      : `<button class="btn btn-hide btn-sm" data-action="hide"   data-id="${tx.id}">🙈 숨기기</button>`;
-    html += `<button class="btn btn-ghost btn-sm" data-action="history" data-id="${tx.id}">📋 이력</button>`;
+if (isCompleted) {
+  if (isMyCard) {
+    html += `<button class="btn btn-ghost btn-sm" data-action="delete" data-id="${tx.id}">🗑️ 삭제</button>`;
+  }
 
-  } else {
-    // 삭제 (내가 등록한 항목만)
-    if (isMyCard) {
-      html += `<button class="btn btn-ghost btn-sm" data-action="delete" data-id="${tx.id}">🗑️ 삭제</button>`;
-    }
+  html += tx.hidden
+    ? `<button class="btn btn-hide btn-sm" data-action="unhide" data-id="${tx.id}">👁️ 복원</button>`
+    : `<button class="btn btn-hide btn-sm" data-action="hide" data-id="${tx.id}">🙈 숨기기</button>`;
+
+  html += `<button class="btn btn-ghost btn-sm" data-action="history" data-id="${tx.id}">📋 이력</button>`;
+} else {
+  // 삭제 (내가 등록한 항목만)
+  if (isMyCard) {
+    html += `<button class="btn btn-ghost btn-sm" data-action="delete" data-id="${tx.id}">🗑️ 삭제</button>`;
+  }
 
     // pending → processing 버튼
     if (tx.status === "pending") {
