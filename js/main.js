@@ -227,12 +227,13 @@ function renderTabList(tab) {
     "completed":       "completed-empty",
   };
 
-  renderList(
-    containerMap[tab],
-    emptyMap[tab],
-    filtered,
-    state.user.uid
-  );
+renderList(
+  containerMap[tab],
+  emptyMap[tab],
+  filtered,
+  state.user.uid,
+  isAdminUser()
+);
 
   // 4. 카드 버튼 이벤트 연결
   attachCardEvents(document.getElementById(containerMap[tab]));
