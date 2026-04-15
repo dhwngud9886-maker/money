@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>비잔티움 장부 관리</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet" />
+</head>
+<body>
+
+  <!-- ================================================================
+       전역 로딩 오버레이
+       Firebase 데이터 로딩 중 또는 버튼 처리 중에 표시됨
+  ================================================================ -->
+  <div id="loading-overlay" class="loading-overlay hidden">
+    <div class="loading-spinner"></div>
+    <p class="loading-text">처리 중...</p>
+  </div>
+
+  <!-- ================================================================
+       토스트 알림 (우측 상단 or 하단에 잠깐 표시되는 메시지)
+       예: "등록되었습니다", "수정되었습니다", "오류가 발생했습니다"
+  ================================================================ -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- ================================================================
+       로그인 화면
+       Firebase Authentication으로 이메일/비밀번호 로그인 처리
+  ================================================================ -->
+  <div id="login-screen" class="login-screen">
+    <div class="login-card">
+      <div class="login-logo">
+        <span class="logo-icon">💼</span>
+        <h1 class="login-title">비잔티움 장부</h1>
+        <p class="login-subtitle">인터넷 판매 업무용 장부 관리 시스템</p>
+      </div>
+
+      <form id="login-form" class="login-form" novalidate>
+        <div class="form-group">
+          <label for="login-email" class="form-label">이메일</label>
+          <input
+            type="email"
+            id="login-email"
+            class="form-input"
+            placeholder="이메일을 입력하세요"
+            autocomplete="email"
+            required
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="login-password" class="form-label">비밀번호</label>
+          <input
+            type="password"
+            id="login-password"
+            class="form-input"
+            placeholder="비밀번호를 입력하세요"
+            autocomplete="current-password"
+            required
+          />
+        </div>
+
+        <!-- 로그인 오류 메시지 -->
+        <p id="login-error" class="error-message hidden"></p>
+
+        <button type="submit" id="login-btn" class="btn btn-primary btn-full">
+          로그인
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================================================================
+       메인 앱 화면 (로그인 성공 후 표시)
+  ================================================================ -->
+  <div id="app-screen" class="app-screen hidden">
+
+    <!-- ────────────────────────────────────────────────
+         헤더
+    ──────────────────────────────────────────────── -->
+    <header class="app-header">
+      <div class="header-inner">
+        <div class="header-left">
+          <span class="header-logo">💼</span>
+          <span class="header-title">비잔티움 장부</span>
+        </div>
+        <div class="header-right">
+          <span id="header-username" class="header-username"></span>
+          <button id="logout-btn" class="btn btn-ghost btn-sm">로그아웃</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- ────────────────────────────────────────────────
+         메인 콘텐츠 영역
+         모바일에서는 하단 탭 높이만큼 패딩 추가됨
+    ──────────────────────────────────────────────── -->
+    <main class="app-main">
+
+      <!-- 잔액 카드 -->
+      <section class="balance-section">
+        <div class="balance-card">
+          <div class="balance-left">
+            <p class="balance-label">현재 잔액</p>
+            <p id="balance-amount" class="balance-amount">₩ 0</p>
+            <p class="balance-note">완료된 입금/송금 기준</p>
+          </div>
+          <div class="balance-right">
+            <button id="balance-setting-btn" class="btn btn-outline btn-sm">
+              잔액 설정
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 통계 대시보드 카드 -->
+      <section class="stats-section">
+        <div class="stats-grid">
+          <!-- 오늘 입금 -->
+          <div class="stat-card stat-deposit">
+            <p class="stat-label">오늘 입금</p>
+            <p id="stat-today-deposit" class="stat-value">₩ 0</p>
+          </div>
+          <!-- 오늘 송금 -->
+          <div class="stat-card stat-transfer">
+            <p class="stat-label">오늘 송금</p>
+            <p id="stat-today-transfer" class="stat-value">₩ 0</p>
+          </div>
+          <!-- 이달 입금 -->
+          <div class="stat-card stat-month-deposit">
+            <p class="stat-label">이달 입금</p>
+            <p id="stat-month-deposit" class="stat-value">₩ 0</p>
+          </div>
+          <!-- 이달 송금 -->
+          <div class="stat-card stat-month-transfer">
+            <p class="stat-label">이달 송금</p>
+            <p id="stat-month-transfer" class="stat-value">₩ 0</p>
+          </div>
+          <!-- 입금 대기 -->
+          <div class="stat-card stat-pending-deposit">
+            <p class="stat-label">입금 대기</p>
+            <p id="stat-pending-deposit-count" class="stat-value">0건</p>
+            <p id="stat-pending-deposit-amount" class="stat-sub">₩ 0</p>
+          </div>
+          <!-- 송금 대기 -->
+          <div class="stat-card stat-pending-transfer">
+            <p class="stat-label">송금 대기</p>
+            <p id="stat-pending-transfer-count" class="stat-value">0건</p>
+            <p id="stat-pending-transfer-amount" class="stat-sub">₩ 0</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- 등록 버튼 영역 (PC 전용 — 모바일은 하단 탭에서 처리) -->
+      <section class="action-buttons pc-only">
+        <button id="add-deposit-btn-pc" class="btn btn-deposit btn-lg">
+          + 입금 등록
+        </button>
+        <button id="add-transfer-btn-pc" class="btn btn-transfer btn-lg">
+          + 송금 등록
+        </button>
+      </section>
+
+      <!-- ── 탭 메뉴 (PC: 상단 / 모바일: 하단 고정) ── -->
+
+      <!-- PC 탭 (상단) -->
+      <nav class="tab-nav pc-tab-nav">
+        <button class="tab-btn active" data-tab="income-pending">
+          입금 대기
+          <span id="tab-badge-deposit" class="tab-badge">0</span>
+        </button>
+        <button class="tab-btn" data-tab="expense-pending">
+          송금 대기
+          <span id="tab-badge-transfer" class="tab-badge">0</span>
+        </button>
+        <button class="tab-btn" data-tab="completed">
+          완료 내역
+        </button>
+      </nav>
+
+      <!-- ── 검색 & 필터 영역 ── -->
+      <section class="filter-section">
+        <div class="filter-row">
+          <!-- 키워드 검색 -->
+          <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input
+              type="text"
+              id="search-input"
+              class="search-input"
+              placeholder="거래처, 메모 검색..."
+            />
+          </div>
+          <!-- 날짜 필터 -->
+          <div class="filter-group">
+            <button class="filter-btn active" data-date-filter="all">전체</button>
+            <button class="filter-btn" data-date-filter="today">오늘</button>
+            <button class="filter-btn" data-date-filter="week">이번주</button>
+          </div>
+        </div>
+
+        <div class="filter-row filter-row-2">
+          <!-- 상태 필터 (완료 탭에서만 의미있음) -->
+          <select id="status-filter" class="filter-select">
+            <option value="all">전체 상태</option>
+            <option value="pending">대기</option>
+            <option value="checking">확인중/진행중</option>
+            <option value="completed">완료</option>
+          </select>
+          <!-- 정렬 -->
+          <select id="sort-select" class="filter-select">
+            <option value="newest">최신순</option>
+            <option value="oldest">오래된순</option>
+            <option value="amount-desc">금액 높은순</option>
+            <option value="amount-asc">금액 낮은순</option>
+          </select>
+          <!-- 금액 범위 필터 -->
+          <div class="amount-filter">
+            <input
+              type="number"
+              id="amount-min"
+              class="amount-input"
+              placeholder="최소 금액"
+            />
+            <span class="amount-separator">~</span>
+            <input
+              type="number"
+              id="amount-max"
+              class="amount-input"
+              placeholder="최대 금액"
+            />
+          </div>
+        </div>
+      </section>
+
+      <!-- ── 탭 콘텐츠 ── -->
+
+      <!-- 입금 대기 탭 -->
+      <section id="tab-income-pending" class="tab-content active">
+        <div id="deposit-pending-list" class="transaction-list">
+          <!-- JavaScript로 카드 동적 렌더링 -->
+          <div class="empty-state" id="deposit-pending-empty">
+            <p class="empty-icon">📭</p>
+            <p class="empty-text">입금 대기 내역이 없습니다.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- 송금 대기 탭 -->
+      <section id="tab-expense-pending" class="tab-content hidden">
+        <div id="transfer-pending-list" class="transaction-list">
+          <div class="empty-state" id="transfer-pending-empty">
+            <p class="empty-icon">📭</p>
+            <p class="empty-text">송금 대기 내역이 없습니다.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- 완료 내역 탭 -->
+      <section id="tab-completed" class="tab-content hidden">
+        <!-- 완료 내역 서브 필터 -->
+        <div class="completed-filter">
+          <button class="sub-filter-btn active" data-completed-filter="all">전체</button>
+          <button class="sub-filter-btn" data-completed-filter="deposit">입금완료</button>
+          <button class="sub-filter-btn" data-completed-filter="transfer">송금완료</button>
+          <!-- 숨긴 내역 토글 -->
+          <label class="toggle-label">
+            <input type="checkbox" id="show-hidden-toggle" />
+            숨긴 내역 보기
+          </label>
+        </div>
+        <div id="completed-list" class="transaction-list">
+          <div class="empty-state" id="completed-empty">
+            <p class="empty-icon">📋</p>
+            <p class="empty-text">완료된 내역이 없습니다.</p>
+          </div>
+        </div>
+      </section>
+
+    </main><!-- /app-main -->
+
+    <!-- ────────────────────────────────────────────────
+         모바일 하단 고정 탭 네비게이션
+    ──────────────────────────────────────────────── -->
+    <nav class="mobile-bottom-nav mobile-only">
+      <button class="mobile-tab-btn active" data-tab="income-pending">
+        <span class="mobile-tab-icon">🔽</span>
+        <span class="mobile-tab-label">입금대기</span>
+        <span id="mobile-badge-deposit" class="mobile-badge hidden">0</span>
+      </button>
+
+      <!-- 가운데 등록 버튼 그룹 -->
+      <div class="mobile-add-group">
+        <button id="add-deposit-btn-mobile" class="mobile-add-btn deposit-add-btn" title="입금 등록">
+          <span>+입금</span>
+        </button>
+        <button id="add-transfer-btn-mobile" class="mobile-add-btn transfer-add-btn" title="송금 등록">
+          <span>+송금</span>
+        </button>
+      </div>
+
+      <button class="mobile-tab-btn" data-tab="expense-pending">
+        <span class="mobile-tab-icon">🔼</span>
+        <span class="mobile-tab-label">송금대기</span>
+        <span id="mobile-badge-transfer" class="mobile-badge hidden">0</span>
+      </button>
+
+      <button class="mobile-tab-btn" data-tab="completed">
+        <span class="mobile-tab-icon">✅</span>
+        <span class="mobile-tab-label">완료내역</span>
+      </button>
+    </nav>
+
+  </div><!-- /app-screen -->
+
+
+  <!-- ================================================================
+       모달 1: 입금 등록 / 수정
+       용도: 입금 항목 신규 등록 또는 기존 항목 수정
+  ================================================================ -->
+  <div id="deposit-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 id="deposit-modal-title" class="modal-title">입금 예정 등록</h2>
+        <button class="modal-close-btn" data-close-modal="deposit-modal">✕</button>
+      </div>
+
+      <form id="deposit-form" class="modal-form" novalidate>
+        <!-- 수정 시 기존 ID 저장용 (숨김 필드) -->
+        <input type="hidden" id="deposit-id" value="" />
+
+        <div class="form-group">
+          <label for="deposit-date" class="form-label">날짜 <span class="required">*</span></label>
+          <input type="date" id="deposit-date" class="form-input" required />
+        </div>
+
+        <div class="form-group">
+          <label for="deposit-name" class="form-label">거래처 / 입금자명 <span class="required">*</span></label>
+          <input
+            type="text"
+            id="deposit-name"
+            class="form-input"
+            placeholder="거래처명 또는 입금자 이름"
+            required
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="deposit-amount" class="form-label">금액 <span class="required">*</span></label>
+          <div class="input-with-unit">
+            <input
+              type="number"
+              id="deposit-amount"
+              class="form-input"
+              placeholder="숫자만 입력 (예: 350000)"
+              min="1"
+              required
+            />
+            <span class="input-unit">원</span>
+          </div>
+          <!-- 입력 중 콤마 미리보기 -->
+          <p id="deposit-amount-preview" class="amount-preview"></p>
+        </div>
+
+        <div class="form-group">
+          <label for="deposit-memo" class="form-label">내용 / 메모</label>
+          <textarea
+            id="deposit-memo"
+            class="form-textarea"
+            placeholder="거래 내용, 메모 등 (선택사항)"
+            rows="3"
+          ></textarea>
+        </div>
+
+        <!-- 폼 오류 메시지 -->
+        <p id="deposit-form-error" class="error-message hidden"></p>
+
+        <div class="modal-footer">
+          <button
+            type="button"
+            class="btn btn-ghost"
+            data-close-modal="deposit-modal"
+          >취소</button>
+          <button type="submit" id="deposit-submit-btn" class="btn btn-deposit">
+            등록하기
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+
+  <!-- ================================================================
+       모달 2: 송금 등록 / 수정
+       용도: 송금 항목 신규 등록 또는 기존 항목 수정
+  ================================================================ -->
+  <div id="transfer-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 id="transfer-modal-title" class="modal-title">송금 예정 등록</h2>
+        <button class="modal-close-btn" data-close-modal="transfer-modal">✕</button>
+      </div>
+
+      <form id="transfer-form" class="modal-form" novalidate>
+        <input type="hidden" id="transfer-id" value="" />
+
+        <div class="form-group">
+          <label for="transfer-date" class="form-label">날짜 <span class="required">*</span></label>
+          <input type="date" id="transfer-date" class="form-input" required />
+        </div>
+
+        <div class="form-group">
+          <label for="transfer-name" class="form-label">송금처 <span class="required">*</span></label>
+          <input
+            type="text"
+            id="transfer-name"
+            class="form-input"
+            placeholder="송금 대상 업체명 또는 이름"
+            required
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="transfer-destination" class="form-label">수신 계좌 / 입금처 정보</label>
+          <input
+            type="text"
+            id="transfer-destination"
+            class="form-input"
+            placeholder="예: 국민은행 123-456-789 (선택사항)"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="transfer-amount" class="form-label">금액 <span class="required">*</span></label>
+          <div class="input-with-unit">
+            <input
+              type="number"
+              id="transfer-amount"
+              class="form-input"
+              placeholder="숫자만 입력 (예: 200000)"
+              min="1"
+              required
+            />
+            <span class="input-unit">원</span>
+          </div>
+          <p id="transfer-amount-preview" class="amount-preview"></p>
+        </div>
+
+        <div class="form-group">
+          <label for="transfer-memo" class="form-label">내용 / 메모</label>
+          <textarea
+            id="transfer-memo"
+            class="form-textarea"
+            placeholder="송금 목적, 메모 등 (선택사항)"
+            rows="3"
+          ></textarea>
+        </div>
+
+        <p id="transfer-form-error" class="error-message hidden"></p>
+
+        <div class="modal-footer">
+          <button
+            type="button"
+            class="btn btn-ghost"
+            data-close-modal="transfer-modal"
+          >취소</button>
+          <button type="submit" id="transfer-submit-btn" class="btn btn-transfer">
+            등록하기
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+
+  <!-- ================================================================
+       모달 3: 잔액 초기 설정
+       용도: 현재 통장 잔액(초기값) 입력
+  ================================================================ -->
+  <div id="balance-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+    <div class="modal-card modal-card-sm">
+      <div class="modal-header">
+        <h2 class="modal-title">통장 잔액 설정</h2>
+        <button class="modal-close-btn" data-close-modal="balance-modal">✕</button>
+      </div>
+
+      <form id="balance-form" class="modal-form" novalidate>
+        <p class="modal-description">
+          현재 실제 통장 잔액을 입력하세요.<br />
+          이 금액을 기준으로 입금/송금 완료 내역이 반영됩니다.
+        </p>
+
+        <div class="form-group">
+          <label for="balance-input" class="form-label">초기 잔액 <span class="required">*</span></label>
+          <div class="input-with-unit">
+            <input
+              type="number"
+              id="balance-input"
+              class="form-input"
+              placeholder="현재 통장 잔액 입력"
+              min="0"
+              required
+            />
+            <span class="input-unit">원</span>
+          </div>
+          <p id="balance-preview" class="amount-preview"></p>
+        </div>
+
+        <p id="balance-form-error" class="error-message hidden"></p>
+
+        <div class="modal-footer">
+          <button
+            type="button"
+            class="btn btn-ghost"
+            data-close-modal="balance-modal"
+          >취소</button>
+          <button type="submit" id="balance-submit-btn" class="btn btn-primary">
+            저장하기
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+
+  <!-- ================================================================
+       모달 4: 삭제 확인 팝업
+       용도: 항목 삭제 전 최종 확인
+  ================================================================ -->
+  <div id="delete-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+    <div class="modal-card modal-card-sm">
+      <div class="modal-header">
+        <h2 class="modal-title">삭제 확인</h2>
+        <button class="modal-close-btn" data-close-modal="delete-modal">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <p class="confirm-message">
+          ⚠️ 이 항목을 정말 삭제하시겠습니까?<br />
+          <strong>삭제된 데이터는 복구할 수 없습니다.</strong>
+        </p>
+        <div id="delete-target-info" class="delete-target-info"></div>
+      </div>
+
+      <div class="modal-footer">
+        <button
+          type="button"
+          class="btn btn-ghost"
+          data-close-modal="delete-modal"
+        >취소</button>
+        <button id="delete-confirm-btn" class="btn btn-danger">
+          삭제하기
+        </button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ================================================================
+       모달 5: 변경 이력 보기
+       용도: 특정 항목의 수정/상태변경 이력 확인
+  ================================================================ -->
+  <div id="history-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 class="modal-title">변경 이력</h2>
+        <button class="modal-close-btn" data-close-modal="history-modal">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <div id="history-list" class="history-list">
+          <!-- JavaScript로 동적 렌더링 -->
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button
+          type="button"
+          class="btn btn-ghost"
+          data-close-modal="history-modal"
+        >닫기</button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ================================================================
+       모달 6: 상태 변경 확인 팝업
+       용도: 완료 처리 전 최종 확인
+  ================================================================ -->
+  <div id="status-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+    <div class="modal-card modal-card-sm">
+      <div class="modal-header">
+        <h2 id="status-modal-title" class="modal-title">상태 변경 확인</h2>
+        <button class="modal-close-btn" data-close-modal="status-modal">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <p id="status-modal-message" class="confirm-message"></p>
+        <div id="status-target-info" class="delete-target-info"></div>
+      </div>
+
+      <div class="modal-footer">
+        <button
+          type="button"
+          class="btn btn-ghost"
+          data-close-modal="status-modal"
+        >취소</button>
+        <button id="status-confirm-btn" class="btn btn-primary">
+          확인
+        </button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ================================================================
+       JavaScript 파일 로드 순서 (중요!)
+       firebase-config.js → auth.js → db.js → stats.js →
+       filters.js → ui.js → main.js 순서로 로드해야 합니다.
+  ================================================================ -->
+  <!-- ================================================================
+       앱 진입점 — main.js 하나만 로드하면 됩니다.
+       나머지 파일들은 ES 모듈 import로 자동 연결됩니다.
+       Firebase SDK는 각 JS 파일 내부에서 CDN으로 직접 import됩니다.
+  ================================================================ -->
+  <script src="js/firebase-config.js" type="module"></script>
+  <script src="js/auth.js" type="module"></script>
+  <script src="js/db.js" type="module"></script>
+  <script src="js/stats.js" type="module"></script>
+  <script src="js/filters.js" type="module"></script>
+  <script src="js/ui.js" type="module"></script>
+  <script src="js/main.js" type="module"></script>
+<script type="module" src="./js/main.js"></script>
+</body>
+</html>
